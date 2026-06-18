@@ -117,23 +117,30 @@
     reload: true
 
 # === Virtualization platform ===
+# Use monolithic libvirtd (not modular daemons) for compatibility with
+# Pulumi libvirt provider which expects /var/run/libvirt/libvirt-sock
 
-- name: Ensure libvirtd is running
-  systemd:
-    name: libvirtd
-    state: started
-    enabled: true
-
-- name: Ensure modular libvirt daemon sockets are active
+- name: Stop modular libvirt daemon sockets
   systemd:
     name: "{{ item }}"
-    state: started
-    enabled: true
+    state: stopped
+    enabled: false
   loop:
     - virtqemud.socket
     - virtstoraged.socket
     - virtnetworkd.socket
     - virtnodedevd.socket
+  ignore_errors: true
+
+- name: Unmask monolithic libvirtd
+  command: systemctl unmask libvirtd
+  changed_when: true
+
+- name: Enable and start monolithic libvirtd
+  systemd:
+    name: libvirtd
+    state: started
+    enabled: true
 
 - name: Wait for libvirt to be ready
   command: virsh pool-list
