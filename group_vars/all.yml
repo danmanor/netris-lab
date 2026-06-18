@@ -65,10 +65,10 @@ ipam_switch_loopback: "10.253.128.0/24"
 bgp_link_subnet: "198.51.100.8/29"
 bgp_password: "newNet0ps"
 bgp_subnets_to_advertise:
-  - "198.51.100.0/30"
-  - "198.51.100.4/30"
-nat_cidr: "198.51.100.0/30"
-l4lb_cidr: "198.51.100.4/30"
+  - "198.51.100.0/29"
+  - "198.51.100.16/29"
+nat_cidr: "198.51.100.0/29"
+l4lb_cidr: "198.51.100.16/29"
 
 # --- North-South Fabric ---
 ns_fabric:
