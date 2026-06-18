@@ -53,8 +53,9 @@
 - name: Install VPN route fix script
   template:
     src: openvpn-route-fix.sh.j2
-    dest: /etc/openvpn/client/route-fix.sh
+    dest: /usr/local/bin/openvpn-route-fix.sh
     mode: '0755'
+    setype: bin_t
 
 - name: Create systemd override directory
   file:
@@ -67,7 +68,7 @@
     dest: /etc/systemd/system/openvpn-client@client.service.d/route-fix.conf
     content: |
       [Service]
-      ExecStartPost=/etc/openvpn/client/route-fix.sh
+      ExecStartPost=/usr/local/bin/openvpn-route-fix.sh
     mode: '0644'
   register: vpn_override
 
