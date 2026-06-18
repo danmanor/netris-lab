@@ -56,6 +56,12 @@
     dest: /etc/openvpn/client/route-fix.sh
     mode: '0755'
 
+- name: Create systemd override directory
+  file:
+    path: /etc/systemd/system/openvpn-client@client.service.d
+    state: directory
+    mode: '0755'
+
 - name: Create systemd override for VPN route fix
   copy:
     dest: /etc/systemd/system/openvpn-client@client.service.d/route-fix.conf
