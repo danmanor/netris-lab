@@ -119,6 +119,20 @@
     state: started
     enabled: true
 
+- name: Ensure virtqemud socket is active
+  systemd:
+    name: virtqemud.socket
+    state: started
+    enabled: true
+
+- name: Wait for libvirt to be ready
+  command: virsh version
+  register: _virsh_ready
+  until: _virsh_ready.rc == 0
+  retries: 10
+  delay: 3
+  changed_when: false
+
 - name: Disable SELinux in libvirt qemu.conf
   lineinfile:
     path: /etc/libvirt/qemu.conf
