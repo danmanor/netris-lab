@@ -78,6 +78,11 @@
       - genisoimage
     state: present
 
+- name: Install Python bcrypt for password fix
+  pip:
+    name: bcrypt
+    state: present
+
 - name: Ensure root SSH key exists
   command: ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
   args:
