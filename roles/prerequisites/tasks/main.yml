@@ -332,3 +332,20 @@
   loop:
     - "{{ bgp_link_subnet }}"
     - "{{ ns_fabric.mgmt_subnet }}"
+    - "{{ nat_cidr }}"
+    - "{{ l4lb_cidr }}"
+
+- name: Disable reverse path filtering on br-public (isolated mode)
+  when: connectivity_mode == "isolated"
+  sysctl:
+    name: "net.ipv4.conf.{{ public_bridge_name }}.rp_filter"
+    value: "0"
+    sysctl_set: true
+
+- name: Route NAT and L4LB pools via ISP server (isolated mode)
+  when: connectivity_mode == "isolated"
+  command: ip route replace {{ item }} via {{ bgp_link_subnet | ansible.utils.ipaddr('network') | ansible.utils.ipmath(2) }} dev {{ public_bridge_name }}
+  loop:
+    - "{{ nat_cidr }}"
+    - "{{ l4lb_cidr }}"
+  changed_when: true
