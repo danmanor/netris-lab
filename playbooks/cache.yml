@@ -1,0 +1,65 @@
+---
+- name: Cache container and cloud images
+  hosts: lab
+  become: true
+  tasks:
+    - name: Create cache directories
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ k3s_image_cache_dir }}"
+        - "{{ k3s_image_cache_dir }}/../cloud-images"
+
+    - name: Pull and save container images (parallel)
+      shell: |
+        cache_dir="{{ k3s_image_cache_dir }}"
+        pids=""
+        for img in {{ container_images | join(' ') }}; do
+          (
+            fname=$(echo "$img" | sed 's|[/:]|_|g')
+            dest="${cache_dir}/${fname}.tar"
+            [ -s "$dest" ] && echo "CACHED $img" && exit 0
+            if podman pull "$img" >/dev/null 2>&1; then
+              podman save -o "$dest" "$img" 2>/dev/null
+              echo "SAVED  $img"
+            else
+              echo "FAILED $img"
+            fi
+          ) &
+          pids="$pids $!"
+        done
+        wait $pids
+      register: cache_result
+
+    - name: Show pull results
+      debug:
+        msg: "{{ cache_result.stdout }}"
+
+    - name: Download cloud images to cache
+      get_url:
+        url: "{{ item.url }}"
+        dest: "{{ k3s_image_cache_dir }}/../cloud-images/{{ item.name }}"
+        mode: '0644'
+      register: cloud_dl
+      until: cloud_dl is success
+      retries: 3
+      delay: 10
+      loop:
+        - { url: "{{ cumulus_image_url }}", name: "{{ cumulus_image_name }}" }
+        - { url: "{{ ubuntu_image_url }}", name: "{{ ubuntu_image_name }}" }
+
+    - name: Cache summary
+      shell: |
+        total=$(ls {{ k3s_image_cache_dir }}/*.tar 2>/dev/null | wc -l)
+        expected={{ container_images | length }}
+        cloud=$(ls {{ k3s_image_cache_dir }}/../cloud-images/{{ cumulus_image_name }} {{ k3s_image_cache_dir }}/../cloud-images/{{ ubuntu_image_name }} 2>/dev/null | wc -l)
+        echo "Container images: ${total}/${expected}"
+        echo "Cloud images: ${cloud}/2"
+        echo "Size: $(du -sh /var/cache/netris-lab/ | cut -f1)"
+      register: summary
+      changed_when: false
+
+    - name: Print summary
+      debug:
+        msg: "{{ summary.stdout }}"
