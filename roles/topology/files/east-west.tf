@@ -28,6 +28,7 @@ locals {
   spine-count                     = var.ew-fabric-enable * max(var.gpu-server-count / 16, 1)
   spine-asn-start                 = 4200200001
   ew-portcount                    = 64
+  ew-leaf-portcount               = var.ew-fabric-enable == 1 ? 64 : 32
   gpu-servers-enable              = 1
   ew-leaf-spine-links-enable      = 1
   ew-leaf-server-links-enable     = 1
@@ -96,8 +97,8 @@ resource "netris_subnet" "switch-loopbacks" {
 
 resource "netris_server" "hgx" {
   count                           = (var.gpu-server-count * local.gpu-servers-enable)
-  name                            = "${var.gpu-server-hostname}-pod00-su${floor(count.index/(netris_switch.leaf[0].portcount/2))}-h${format("%02d", count.index - ((netris_switch.leaf[0].portcount/2)*floor(count.index/(netris_switch.leaf[0].portcount/2))))}"
-  description                     = "${var.gpu-server-hostname}-pod00-su${floor(count.index/(netris_switch.leaf[0].portcount/2))}-h${format("%02d", count.index - ((netris_switch.leaf[0].portcount/2)*floor(count.index/(netris_switch.leaf[0].portcount/2))))}"
+  name                            = "${var.gpu-server-hostname}-pod00-su${floor(count.index/(local.ew-leaf-portcount/2))}-h${format("%02d", count.index - ((local.ew-leaf-portcount/2)*floor(count.index/(local.ew-leaf-portcount/2))))}"
+  description                     = "${var.gpu-server-hostname}-pod00-su${floor(count.index/(local.ew-leaf-portcount/2))}-h${format("%02d", count.index - ((local.ew-leaf-portcount/2)*floor(count.index/(local.ew-leaf-portcount/2))))}"
   tenantid                        = data.netris_tenant.admin.id
   siteid                          = netris_site.site1.id
   portcount                       = 16
@@ -227,12 +228,12 @@ resource "netris_switch" "spine" {
 resource "netris_link" "leaf-to-spine" {
   count                           = (local.leaf-count * local.ew-portcount * local.ew-leaf-spine-links-enable)
   ports                           = [ 
-                                      "swp${(floor((count.index - ((netris_switch.leaf[0].portcount)*floor(count.index/(netris_switch.leaf[0].portcount))) + (netris_switch.leaf[0].portcount) )/2) +1)}s${ (count.index - (2*(floor(count.index/2))) )}@${netris_switch.leaf[(floor(count.index/(netris_switch.leaf[0].portcount)))].name}",
+                                      "swp${(floor((count.index - ((local.ew-leaf-portcount)*floor(count.index/(local.ew-leaf-portcount))) + (local.ew-leaf-portcount) )/2) +1)}s${ (count.index - (2*(floor(count.index/2))) )}@${netris_switch.leaf[(floor(count.index/(local.ew-leaf-portcount)))].name}",
                                       "swp${(floor((count.index - ((netris_switch.spine[0].portcount/local.spine-count) * floor (count.index / (netris_switch.spine[0].portcount / local.spine-count) )) +  ((netris_switch.spine[0].portcount/local.spine-count)*floor(count.index/netris_switch.spine[0].portcount))  )/2)+1)}s${( (count.index -  ((netris_switch.spine[0].portcount/local.spine-count) * floor (count.index / (netris_switch.spine[0].portcount / local.spine-count) )) +  ((netris_switch.spine[0].portcount/local.spine-count)*floor(count.index/netris_switch.spine[0].portcount))  ) - (2*floor((count.index -  ((netris_switch.spine[0].portcount/local.spine-count) * floor (count.index / (netris_switch.spine[0].portcount / local.spine-count) )) +  ((netris_switch.spine[0].portcount/local.spine-count)*floor(count.index/netris_switch.spine[0].portcount))  )/2)))}@${netris_switch.spine[( floor(count.index / ( netris_switch.spine[0].portcount / local.spine-count)) - (local.spine-count*floor(count.index/netris_switch.spine[0].portcount)) )].name}"
   ]
   ipv4                            = [
-                                      "10.254.${( floor(count.index / ( netris_switch.spine[0].portcount / local.spine-count)) - (local.spine-count*floor(count.index/netris_switch.spine[0].portcount)) )}.${ ((count.index - (netris_switch.leaf[0].portcount/local.spine-count) * floor((count.index / (netris_switch.leaf[0].portcount/local.spine-count)) ) ) *2 ) + ((netris_switch.leaf[0].portcount/local.spine-count) * 2 * ((floor(count.index/(netris_switch.leaf[0].portcount)))) )  }/31",
-                                      "10.254.${( floor(count.index / ( netris_switch.spine[0].portcount / local.spine-count)) - (local.spine-count*floor(count.index/netris_switch.spine[0].portcount)) )}.${ ((count.index - (netris_switch.leaf[0].portcount/local.spine-count) * floor((count.index / (netris_switch.leaf[0].portcount/local.spine-count)) ) ) *2 ) + 1 + ((netris_switch.leaf[0].portcount/local.spine-count) * 2 * ((floor(count.index/(netris_switch.leaf[0].portcount)))) )  }/31"
+                                      "10.254.${( floor(count.index / ( netris_switch.spine[0].portcount / local.spine-count)) - (local.spine-count*floor(count.index/netris_switch.spine[0].portcount)) )}.${ ((count.index - (local.ew-leaf-portcount/local.spine-count) * floor((count.index / (local.ew-leaf-portcount/local.spine-count)) ) ) *2 ) + ((local.ew-leaf-portcount/local.spine-count) * 2 * ((floor(count.index/(local.ew-leaf-portcount)))) )  }/31",
+                                      "10.254.${( floor(count.index / ( netris_switch.spine[0].portcount / local.spine-count)) - (local.spine-count*floor(count.index/netris_switch.spine[0].portcount)) )}.${ ((count.index - (local.ew-leaf-portcount/local.spine-count) * floor((count.index / (local.ew-leaf-portcount/local.spine-count)) ) ) *2 ) + 1 + ((local.ew-leaf-portcount/local.spine-count) * 2 * ((floor(count.index/(local.ew-leaf-portcount)))) )  }/31"
   ]
   depends_on                      = [
                                       netris_switch.spine,
@@ -248,12 +249,12 @@ locals {
 resource "netris_link" "leaf-to-hgx" {
   count                           = (min(local.leaf-count * local.ew-portcount, var.gpu-server-count * 2 * local.leaf-count) * local.gpu-servers-enable * local.ew-leaf-server-links-enable)
   ports                           = [
-                                      "swp${floor((count.index - ((netris_switch.leaf[0].portcount)*floor(count.index/(netris_switch.leaf[0].portcount))))/2)+1}s${ (count.index - (2*(floor(count.index/2))) )}@${netris_switch.leaf[(floor(count.index/(netris_switch.leaf[0].portcount)))].name}",
-                                      "eth${( floor(count.index/(netris_switch.leaf[0].portcount)) - (4*floor(count.index/(netris_switch.leaf[0].portcount*4))) + (4*(count.index - (2*floor(count.index/2)))) + 1  )}@${netris_server.hgx[(floor(count.index/2) - ((netris_switch.leaf[0].portcount)*floor(count.index/(netris_switch.leaf[0].portcount))/2) + (floor(count.index/(4*netris_switch.leaf[0].portcount))*(netris_switch.leaf[0].portcount/2)) )].name}"
+                                      "swp${floor((count.index - ((local.ew-leaf-portcount)*floor(count.index/(local.ew-leaf-portcount))))/2)+1}s${ (count.index - (2*(floor(count.index/2))) )}@${netris_switch.leaf[(floor(count.index/(local.ew-leaf-portcount)))].name}",
+                                      "eth${( floor(count.index/(local.ew-leaf-portcount)) - (4*floor(count.index/(local.ew-leaf-portcount*4))) + (4*(count.index - (2*floor(count.index/2)))) + 1  )}@${netris_server.hgx[(floor(count.index/2) - ((local.ew-leaf-portcount)*floor(count.index/(local.ew-leaf-portcount))/2) + (floor(count.index/(4*local.ew-leaf-portcount))*(local.ew-leaf-portcount/2)) )].name}"
   ]
   ipv4                            = [
-                                      "${var.server-ip-first-octet}.${local.second-octet[( floor(count.index/(netris_switch.leaf[0].portcount)) - (4*floor(count.index/(netris_switch.leaf[0].portcount*4))) + (4*(count.index - (2*floor(count.index/2))))  )]}.${floor(count.index/(netris_switch.leaf[0].portcount*4))}.${ ( 2 * ((floor(count.index/2) - ((netris_switch.leaf[0].portcount)*floor(count.index/(netris_switch.leaf[0].portcount))/2) + (floor(count.index/(4*netris_switch.leaf[0].portcount))*(netris_switch.leaf[0].portcount/2)) ) - (32 * floor(count.index/(netris_switch.leaf[0].portcount*4)))  ) + 1  ) }/31",
-                                      "${var.server-ip-first-octet}.${local.second-octet[( floor(count.index/(netris_switch.leaf[0].portcount)) - (4*floor(count.index/(netris_switch.leaf[0].portcount*4))) + (4*(count.index - (2*floor(count.index/2))))  )]}.${floor(count.index/(netris_switch.leaf[0].portcount*4))}.${ ( 2 * ((floor(count.index/2) - ((netris_switch.leaf[0].portcount)*floor(count.index/(netris_switch.leaf[0].portcount))/2) + (floor(count.index/(4*netris_switch.leaf[0].portcount))*(netris_switch.leaf[0].portcount/2)) ) - (32 * floor(count.index/(netris_switch.leaf[0].portcount*4)))  ) + 0  ) }/31"
+                                      "${var.server-ip-first-octet}.${local.second-octet[( floor(count.index/(local.ew-leaf-portcount)) - (4*floor(count.index/(local.ew-leaf-portcount*4))) + (4*(count.index - (2*floor(count.index/2))))  )]}.${floor(count.index/(local.ew-leaf-portcount*4))}.${ ( 2 * ((floor(count.index/2) - ((local.ew-leaf-portcount)*floor(count.index/(local.ew-leaf-portcount))/2) + (floor(count.index/(4*local.ew-leaf-portcount))*(local.ew-leaf-portcount/2)) ) - (32 * floor(count.index/(local.ew-leaf-portcount*4)))  ) + 1  ) }/31",
+                                      "${var.server-ip-first-octet}.${local.second-octet[( floor(count.index/(local.ew-leaf-portcount)) - (4*floor(count.index/(local.ew-leaf-portcount*4))) + (4*(count.index - (2*floor(count.index/2))))  )]}.${floor(count.index/(local.ew-leaf-portcount*4))}.${ ( 2 * ((floor(count.index/2) - ((local.ew-leaf-portcount)*floor(count.index/(local.ew-leaf-portcount))/2) + (floor(count.index/(4*local.ew-leaf-portcount))*(local.ew-leaf-portcount/2)) ) - (32 * floor(count.index/(local.ew-leaf-portcount*4)))  ) + 0  ) }/31"
   ]
   underlay                        = "disabled"
   depends_on                      = [
