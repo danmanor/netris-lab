@@ -119,14 +119,19 @@
     state: started
     enabled: true
 
-- name: Ensure virtqemud socket is active
+- name: Ensure modular libvirt daemon sockets are active
   systemd:
-    name: virtqemud.socket
+    name: "{{ item }}"
     state: started
     enabled: true
+  loop:
+    - virtqemud.socket
+    - virtstoraged.socket
+    - virtnetworkd.socket
+    - virtnodedevd.socket
 
 - name: Wait for libvirt to be ready
-  command: virsh version
+  command: virsh pool-list
   register: _virsh_ready
   until: _virsh_ready.rc == 0
   retries: 10
