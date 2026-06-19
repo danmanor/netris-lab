@@ -51,8 +51,15 @@
 - name: Import cached container images
   when: image_cache.stat.exists
   shell: |
-    for img in {{ k3s_image_cache_dir }}/*.tar; do
-      [ -s "$img" ] && k3s ctr images import "$img" 2>/dev/null || true
+    for imgdir in {{ k3s_image_cache_dir }}/*/; do
+      [ -f "${imgdir}image-ref" ] || continue
+      img_ref=$(cat "${imgdir}image-ref")
+      k3s ctr images import-from-dir "${imgdir}" "$img_ref" 2>/dev/null || \
+        skopeo copy "dir:${imgdir}" "containers-storage:$img_ref" 2>/dev/null || true
+    done
+    # also import any legacy tar files
+    for archive in {{ k3s_image_cache_dir }}/*.tar; do
+      [ -s "$archive" ] && k3s ctr images import "$archive" 2>/dev/null || true
     done
   changed_when: false
 
