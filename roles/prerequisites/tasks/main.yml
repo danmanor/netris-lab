@@ -347,10 +347,3 @@
     value: "0"
     sysctl_set: true
 
-- name: Route NAT and L4LB pools via ISP server (isolated mode)
-  when: connectivity_mode == "isolated"
-  command: ip route replace {{ item }} via {{ bgp_link_subnet | ansible.utils.ipaddr('network') | ansible.utils.ipmath(2) }} dev {{ public_bridge_name }}
-  loop:
-    - "{{ nat_cidr }}"
-    - "{{ l4lb_cidr }}"
-  changed_when: true
