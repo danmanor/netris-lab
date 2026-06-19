@@ -68,6 +68,11 @@
     chmod +x /tmp/install-opentofu.sh
     /tmp/install-opentofu.sh --install-method rpm
 
+- name: Enable EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+
 - name: Install required packages
   dnf:
     name:
