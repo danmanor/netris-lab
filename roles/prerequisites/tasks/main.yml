@@ -99,7 +99,7 @@
   register: root_pubkey
 
 - name: Ensure root key in authorized_keys
-  authorized_key:
+  ansible.posix.authorized_key:
     user: root
     key: "{{ root_pubkey.content | b64decode }}"
     state: present
@@ -115,7 +115,7 @@
   changed_when: false
 
 - name: Set rmem_default sysctl
-  sysctl:
+  ansible.posix.sysctl:
     name: net.core.rmem_default
     value: "2129920"
     sysctl_set: true
@@ -246,7 +246,7 @@
   when: firewalld_state.rc == 0
   block:
     - name: Configure firewalld trusted zone for lab interfaces
-      firewalld:
+      ansible.posix.firewalld:
         zone: trusted
         interface: "{{ item }}"
         permanent: true
@@ -263,7 +263,7 @@
       ignore_errors: true
 
     - name: Configure firewalld trusted zone for pod/service CIDRs
-      firewalld:
+      ansible.posix.firewalld:
         zone: trusted
         source: "{{ item }}"
         permanent: true
@@ -275,7 +275,7 @@
         - 192.168.122.0/24
 
     - name: Open required ports in public zone
-      firewalld:
+      ansible.posix.firewalld:
         port: "{{ item }}"
         permanent: true
         immediate: true
@@ -294,7 +294,7 @@
         - "{{ controller_ui_port }}/tcp"
 
     - name: Open traefik NodePort in public zone
-      firewalld:
+      ansible.posix.firewalld:
         port: "31000-32767/tcp"
         permanent: true
         immediate: true
@@ -327,7 +327,7 @@
 
 - name: Masquerade VM bridge traffic for internet access (isolated mode)
   when: connectivity_mode == "isolated"
-  iptables:
+  ansible.builtin.iptables:
     table: nat
     chain: POSTROUTING
     source: "{{ item }}"
@@ -342,7 +342,7 @@
 
 - name: Disable reverse path filtering on br-public (isolated mode)
   when: connectivity_mode == "isolated"
-  sysctl:
+  ansible.posix.sysctl:
     name: "net.ipv4.conf.{{ public_bridge_name }}.rp_filter"
     value: "0"
     sysctl_set: true
