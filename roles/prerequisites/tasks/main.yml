@@ -229,22 +229,6 @@
     virsh pool-start default
     virsh pool-autostart default
 
-- name: Check if cloud image cache exists
-  stat:
-    path: "{{ k3s_image_cache_dir }}/../cloud-images/{{ cumulus_image_name }}"
-  register: _cloud_cache_check
-
-- name: Copy cloud images from cache
-  copy:
-    src: "{{ k3s_image_cache_dir }}/../cloud-images/{{ item }}"
-    dest: "{{ libvirt_images_dir }}/{{ item }}"
-    remote_src: true
-    force: false
-  loop:
-    - "{{ cumulus_image_name }}"
-    - "{{ ubuntu_image_name }}"
-  when: _cloud_cache_check.stat.exists
-
 - name: Check if firewalld is running
   command: firewall-cmd --state
   register: firewalld_state
