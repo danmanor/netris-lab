@@ -169,7 +169,7 @@
     path: /etc/libvirt/qemu.conf
     regexp: '^#?security_driver\s*='
     line: 'security_driver = "none"'
-  notify: restart libvirtd
+  notify: Restart libvirtd
 
 - name: Check br-mgmt exists
   command: ip link show {{ mgmt_bridge_name }}
@@ -302,7 +302,7 @@
     path: /etc/libvirt/network.conf
     regexp: '^#?firewall_backend\s*='
     line: 'firewall_backend = "nftables"'
-  notify: restart libvirtd
+  notify: Restart libvirtd
 
 - name: Flush restrictive libvirt nftables chains
   shell: |
@@ -339,4 +339,3 @@
     name: "net.ipv4.conf.{{ public_bridge_name }}.rp_filter"
     value: "0"
     sysctl_set: true
-

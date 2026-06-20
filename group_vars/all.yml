@@ -159,10 +159,10 @@ libvirt_images_dir: "/var/lib/libvirt/images"
 
 # --- Socat port forwarding ---
 controller_service_ports:
-  - { name: "grpc",      port: 50051 }
-  - { name: "telescope",  port: 3033 }
-  - { name: "telescope-tls", port: 3034 }
-  - { name: "graphite",   port: 2003 }
+  - {name: "grpc", port: 50051}
+  - {name: "telescope", port: 3033}
+  - {name: "telescope-tls", port: 3034}
+  - {name: "graphite", port: 2003}
 
 # --- License (path to local file, not committed to git) ---
 netris_license_file: "{{ playbook_dir }}/../license.key"

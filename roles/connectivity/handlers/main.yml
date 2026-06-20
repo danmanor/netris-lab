@@ -1,9 +1,9 @@
 ---
-- name: reload systemd
+- name: Reload systemd
   systemd:
     daemon_reload: true
 
-- name: restart socat forwarders
+- name: Restart socat forwarders
   shell: |
     systemctl daemon-reload
     for svc in $(systemctl list-units --type=service --all | grep socat-forwarder | awk '{print $1}'); do
