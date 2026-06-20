@@ -51,17 +51,23 @@
 - name: Import cached container images
   when: image_cache.stat.exists
   shell: |
+    imported=0
     for imgdir in {{ k3s_image_cache_dir }}/*/; do
       [ -f "${imgdir}image-ref" ] || continue
       img_ref=$(cat "${imgdir}image-ref")
-      k3s ctr images import-from-dir "${imgdir}" "$img_ref" 2>/dev/null || \
-        skopeo copy "dir:${imgdir}" "containers-storage:$img_ref" 2>/dev/null || true
+      if k3s ctr images check "name==${img_ref}" 2>/dev/null | grep -q "${img_ref}"; then
+        continue
+      fi
+      tmptar=$(mktemp /tmp/k3s-import-XXXXXX.tar)
+      if skopeo copy "dir:${imgdir}" "oci-archive:${tmptar}:${img_ref}" 2>/dev/null && \
+         k3s ctr images import "${tmptar}" 2>/dev/null; then
+        imported=$((imported + 1))
+      fi
+      rm -f "${tmptar}"
     done
-    # also import any legacy tar files
-    for archive in {{ k3s_image_cache_dir }}/*.tar; do
-      [ -s "$archive" ] && k3s ctr images import "$archive" 2>/dev/null || true
-    done
-  changed_when: false
+    echo "Imported ${imported} images from cache"
+  register: _image_import
+  changed_when: "'Imported 0' not in _image_import.stdout"
 
 - name: Deploy cert-manager manifest
   copy:
