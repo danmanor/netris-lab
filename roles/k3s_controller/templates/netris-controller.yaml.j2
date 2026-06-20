@@ -11,7 +11,7 @@ metadata:
   name: netris-controller
   namespace: netris-controller
 spec:
-  failurePolicy: abort
+  failurePolicy: reinstall
   chart: https://github.com/netrisai/charts/releases/download/netris-controller-{{ netris_controller_chart_version }}/netris-controller-{{ netris_controller_chart_version }}.tgz
   targetNamespace: netris-controller
   valuesContent: |-
