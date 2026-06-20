@@ -108,6 +108,46 @@
   set_fact:
     controller_nodeport: "{{ traefik_nodeport.stdout }}"
 
+- name: Create socat env directory
+  file:
+    path: /etc/netris-lab/socat
+    state: directory
+
+- name: Install socat-forwarder systemd template
+  copy:
+    dest: /etc/systemd/system/socat-forwarder@.service
+    content: |
+      [Unit]
+      Description=Socat forwarder %i
+      After=network-online.target k3s.service
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      ExecStart=/usr/bin/socat TCP-LISTEN:${PORT},bind=${BIND_IP},fork,reuseaddr TCP:${TARGET_IP}:${TARGET_PORT}
+      Restart=always
+      RestartSec=5
+      EnvironmentFile=/etc/netris-lab/socat/%i.env
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Create controller UI socat env file (port {{ controller_ui_port }} -> traefik NodePort)
+  copy:
+    dest: "/etc/netris-lab/socat/0.0.0.0-{{ controller_ui_port }}.env"
+    content: |
+      BIND_IP=0.0.0.0
+      PORT={{ controller_ui_port }}
+      TARGET_IP=127.0.0.1
+      TARGET_PORT={{ traefik_nodeport.stdout }}
+
+- name: Start controller UI socat forwarder
+  systemd:
+    name: "socat-forwarder@0.0.0.0-{{ controller_ui_port }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+
 - name: Fix controller password
   include_tasks: password_fix.yml
 
