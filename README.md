@@ -1,21 +1,17 @@
 # Netris Spectrum-X GPU Cluster Lab
 
-Automated deployment of a Netris Spectrum-X GPU cluster network simulation lab on a single RHEL bare-metal server. Creates KVM VMs simulating Cumulus Linux switches, Ubuntu GPU servers, Netris softgates, an ISP server, and a management server — all orchestrated by a Netris controller on K3s.
+Automated deployment of a Netris Spectrum-X GPU cluster network simulation lab on a single bare-metal server. Creates KVM VMs simulating Cumulus Linux switches, Ubuntu GPU servers, Netris softgates, an ISP server, and a management server — all orchestrated by a Netris controller on K3s.
 
 ## Prerequisites
 
-- **OS**: RHEL 9.x with KVM/libvirt running
-- **Repos**: EPEL enabled
+- **OS**: RHEL 9.x or Rocky Linux 9.x
 - **Access**: Root
 - **Hardware**: 16+ cores, 64GB+ RAM, 100GB+ disk in `/var/lib/libvirt/images`
 - **Network**: Internet access for image/package downloads
-- **Tools**: Ansible installed
+- **Tools**: Ansible installed (`dnf install -y ansible-core`)
+- **License**: Netris license key at `./license.key` (gitignored)
 
-```bash
-dnf install -y epel-release
-dnf install -y ansible libvirt qemu-kvm virt-install
-systemctl enable --now libvirtd
-```
+All other dependencies (EPEL, libvirt, qemu-kvm, Go, Pulumi, OpenTofu, openvpn, skopeo, etc.) are installed automatically by the `prerequisites` role.
 
 ## Quick Start
 
@@ -116,8 +112,8 @@ public_bgp_subnets_to_advertise:
 ## Usage
 
 ```bash
-make setup           # deploy + cache (first time)
-make deploy          # Full deployment
+make setup           # prerequisites + cache (first time)
+make deploy          # Full deployment (all roles in sequence)
 make destroy         # Tear down everything (K3s, VMs, topology)
 make verify          # Health check — asserts all switches, softgates, E-BGP healthy
 make connectivity    # Re-run connectivity only (VPN, socat, softgates, ISP)
@@ -169,24 +165,31 @@ netris-lab/
 ├── group_vars/all.yml                  # all configuration
 ├── inventory/lab.yml
 ├── playbooks/
+│   ├── cache.yml                       # image caching
 │   ├── deploy.yml                      # full deploy
 │   ├── destroy.yml                     # full teardown (caches images before uninstall)
+│   ├── prerequisites.yml               # system dependencies
 │   ├── verify.yml                      # health check — asserts switches/softgates/E-BGP
 │   └── connectivity.yml                # connectivity-only re-run
 ├── roles/
-│   ├── prerequisites/                  # Go, Pulumi, OpenTofu, openvpn, socat, SSH
-│   ├── hypervisor/                     # libvirt, bridges, images, firewalld, masquerade
+│   ├── prerequisites/                  # Go, Pulumi, OpenTofu, libvirt, bridges, firewall, packages
+│   ├── cache/                          # Pre-download container and cloud images (skopeo)
 │   ├── k3s_controller/                 # K3s, container image cache, Netris Helm chart, license
 │   ├── topology/                       # OpenTofu — creates switches, servers, links in controller
 │   ├── cloudsim/                       # Pulumi — creates KVM VMs simulating the topology
-│   └── connectivity/                   # VPN, socat port forwarding, ISP FRR, softgate agents
+│   ├── connectivity/                   # VPN, socat port forwarding, ISP FRR, softgate agents
+│   └── verify/                         # Health checks via Netris API
 ├── collections/
-│   └── ansible_collections/netris/controller/  # API collection (auth, inventory, ebgp, license, general)
+│   └── ansible_collections/            # netris.controller, ansible.posix, ansible.utils
 ├── netris-cloudsim/                    # Pulumi Go project for VM provisioning
 └── docs/
     ├── architecture.md                 # full Spectrum-X simulation deep-dive
-    └── troubleshooting.md              # all known RHEL deployment issues
+    └── troubleshooting.md              # all known issues and fixes
 ```
+
+## Integration with netris-test-infra
+
+This project can be used standalone, or as a submodule of [netris-test-infra](https://github.com/danmanor/netris-test-infra) which adds OCP installation and OSAC deployment on top. When used as a submodule, the parent project includes these roles via `include_role` rather than running them as separate playbooks.
 
 ## Further Reading
 
