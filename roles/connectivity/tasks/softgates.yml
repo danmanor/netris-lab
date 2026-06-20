@@ -49,10 +49,47 @@
   ignore_errors: true
   changed_when: false
 
-- name: Install and verify softgate agents
-  ansible.builtin.include_tasks: softgate_agents.yml
+- name: Check if netris agent is running on softgates
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{{ item.mgmt_ip }} \
+      "systemctl is-active netris-sg 2>/dev/null" 2>/dev/null
+  loop: "{{ softgates }}"
+  register: sg_agent_check
+  changed_when: false
+  ignore_errors: true
 
-- name: Wait for all E-BGP sessions to establish
+- name: Install netris agent on softgates and disable DPDK
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=30 root@{{ item.item.mgmt_ip }} "
+      curl -fsSL https://get.netris.io | sh -s -- \
+        --lo {{ item.item.main_ip }} \
+        --controller 10.8.0.2 \
+        --hostname {{ item.item.name }} \
+        --auth {{ netris_auth_token }} \
+        --node-type {{ ns_fabric.softgate_node_type }}
+
+      if [ -f /opt/netris/etc/netris.conf ]; then
+        sed -i 's/^dpdk.*/dpdk                 = no/' /opt/netris/etc/netris.conf
+        systemctl restart netris-sg 2>/dev/null || true
+      fi
+    " 2>&1 | tail -5
+  loop: "{{ sg_agent_check.results }}"
+  when: item.stdout is not defined or item.stdout != "active"
+  ignore_errors: true
+
+- name: Wait for softgate agents to become active
+  shell: |
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{{ item.mgmt_ip }} \
+      "systemctl is-active netris-sg 2>/dev/null" 2>/dev/null
+  loop: "{{ softgates }}"
+  register: sg_active_check
+  until: sg_active_check.stdout is defined and sg_active_check.stdout == "active"
+  retries: 20
+  delay: 15
+  ignore_errors: true
+  changed_when: false
+
+- name: Wait for E-BGP sessions to establish
   ansible.builtin.include_tasks: ebgp_wait.yml
   vars:
     netris_controller_url: "http://localhost:{{ traefik_np.stdout }}"

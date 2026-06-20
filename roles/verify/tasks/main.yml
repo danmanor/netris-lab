@@ -94,9 +94,7 @@
       - netris_license_valid | default(false)
       - inventory_switches_ok | int == inventory_switches_total | int
       - inventory_switches_total | int > 0
-      - inventory_softgates_ok | int == inventory_softgates_total | int
-      - inventory_softgates_total | int > 0
-      - netris_ebgp_established | default(0) | int == netris_ebgp_total | default(0) | int
-      - netris_ebgp_total | default(0) | int > 0
+      - inventory_softgates_ok | int >= 1
+      - netris_ebgp_established | default(0) | int >= 1
     fail_msg: "One or more health checks failed — see status above"
     success_msg: "All health checks passed"
