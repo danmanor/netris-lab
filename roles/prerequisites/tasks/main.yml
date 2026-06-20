@@ -87,6 +87,7 @@
       - qemu-kvm
       - virt-install
       - skopeo
+      - nftables
     state: present
 
 - name: Install Python dependencies
