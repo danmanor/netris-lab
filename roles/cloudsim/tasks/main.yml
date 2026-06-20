@@ -17,7 +17,7 @@
 
 - name: Sync cloudsim code
   synchronize:
-    src: "{{ playbook_dir }}/../netris-cloudsim/"
+    src: "{{ role_path }}/../../netris-cloudsim/"
     dest: "{{ cloudsim_dir }}/"
     rsync_opts:
       - "--exclude=.git"

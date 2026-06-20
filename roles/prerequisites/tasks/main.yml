@@ -2,7 +2,7 @@
 # === Ansible collections ===
 
 - name: Install Ansible collections
-  command: ansible-galaxy collection install -r {{ playbook_dir }}/../requirements.yml -p {{ playbook_dir }}/../collections --force
+  command: ansible-galaxy collection install -r {{ role_path }}/../../requirements.yml -p {{ role_path }}/../../collections --force
   changed_when: false
 
 # === Software tools ===
