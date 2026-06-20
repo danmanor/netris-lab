@@ -89,9 +89,11 @@
       - skopeo
     state: present
 
-- name: Install Python bcrypt for password fix
+- name: Install Python dependencies
   pip:
-    name: bcrypt
+    name:
+      - bcrypt
+      - netaddr
     state: present
 
 - name: Ensure root SSH key exists
