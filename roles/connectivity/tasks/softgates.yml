@@ -77,16 +77,17 @@
   when: item.stdout is not defined or item.stdout != "active"
   ignore_errors: true
 
-- name: Wait for softgate agents to become active
+- name: Wait for at least one softgate agent to become active
   shell: |
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{{ item.mgmt_ip }} \
-      "systemctl is-active netris-sg 2>/dev/null" 2>/dev/null
-  loop: "{{ softgates }}"
-  register: sg_active_check
-  until: sg_active_check.stdout is defined and sg_active_check.stdout == "active"
+    for ip in {{ softgates | map(attribute='mgmt_ip') | join(' ') }}; do
+      status=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@${ip} "systemctl is-active netris-sg 2>/dev/null" 2>/dev/null)
+      [ "$status" = "active" ] && echo "active:${ip}" && exit 0
+    done
+    exit 1
+  register: _sg_wait
+  until: _sg_wait.rc == 0
   retries: 20
   delay: 15
-  ignore_errors: true
   changed_when: false
 
 - name: Wait for E-BGP sessions to establish
