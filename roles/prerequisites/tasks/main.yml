@@ -81,6 +81,7 @@
       - rsync
       - libxslt
       - genisoimage
+      - python3-pip
     state: present
 
 - name: Install Python bcrypt for password fix
