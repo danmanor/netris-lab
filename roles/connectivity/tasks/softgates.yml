@@ -90,25 +90,8 @@
   ignore_errors: true
   changed_when: false
 
-- name: Poll E-BGP sessions until all established
-  ansible.builtin.uri:
-    url: "http://localhost:{{ traefik_np.stdout }}/api/v2/ebgp"
-    method: GET
-    headers:
-      Cookie: "connect.sid={{ netris_session_cookie }}"
-    validate_certs: false
-    timeout: 10
-  register: _ebgp_poll
-  until:
-    - _ebgp_poll.json.data | length > 0
-    - (_ebgp_poll.json.data | selectattr('bgp_state', 'defined') | selectattr('bgp_state', 'equalto', 'Established') | list | length) == (_ebgp_poll.json.data | length)
-  retries: 40
-  delay: 15
-
-- name: Set E-BGP facts via collection
-  ansible.builtin.include_role:
-    name: netris.controller.ebgp
+- name: Wait for all E-BGP sessions to establish
+  ansible.builtin.include_tasks: ebgp_wait.yml
   vars:
     netris_controller_url: "http://localhost:{{ traefik_np.stdout }}"
     netris_username: "{{ netris_login }}"
-    ebgp_state: read
