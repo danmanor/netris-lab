@@ -82,6 +82,11 @@
       - libxslt
       - genisoimage
       - python3-pip
+      - libvirt
+      - libvirt-daemon-kvm
+      - qemu-kvm
+      - virt-install
+      - skopeo
     state: present
 
 - name: Install Python bcrypt for password fix
