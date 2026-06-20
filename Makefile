@@ -1,4 +1,4 @@
-.PHONY: setup prerequisites cache deploy destroy verify connectivity
+.PHONY: setup prerequisites cache deploy destroy verify connectivity lint
 
 setup: prerequisites cache
 
@@ -19,3 +19,6 @@ verify:
 
 connectivity:
 	ansible-playbook playbooks/connectivity.yml
+
+lint:
+	ansible-lint

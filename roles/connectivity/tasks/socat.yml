@@ -18,7 +18,7 @@
   template:
     src: socat-forwarder@.service.j2
     dest: /etc/systemd/system/socat-forwarder@.service
-  notify: reload systemd
+  notify: Reload systemd
 
 - name: Create socat env files
   copy:
@@ -29,7 +29,7 @@
       TARGET_IP={{ haproxy_pod_ip.stdout }}
       TARGET_PORT={{ item.1.port }}
   loop: "{{ ['10.8.0.2', ansible_default_ipv4.address] | product(controller_service_ports) | list }}"
-  notify: restart socat forwarders
+  notify: Restart socat forwarders
 
 - name: Enable and start socat forwarders
   systemd:
