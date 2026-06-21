@@ -58,7 +58,12 @@ The result is a fully functional network simulation where:
 This allows development, testing, and demonstration of Spectrum-X network
 configurations without requiring millions of dollars of physical hardware.
 
-**Scale for 32 GPU servers:**
+The topology is configurable via `gpu_server_count` (default: 4, max: 32)
+and `ew_fabric_enable` (default: 0). The default deployment is NS-only with
+4 GPU servers. The maximum scale below assumes `gpu_server_count=32` and
+`ew_fabric_enable=1`:
+
+**Maximum scale (32 GPU servers, full EW+NS fabric):**
 
 - 13 switch VMs (Cumulus Linux)
 - 32 GPU server VMs (Ubuntu -- simulated, no real GPUs)
@@ -66,7 +71,7 @@ configurations without requiring millions of dollars of physical hardware.
 - 4 softgate VMs (Ubuntu + netris-softgate agent)
 - 1 mgmt-server VM (DHCP, DNS, Apache, OpenVPN, NAT gateway)
 - 1 isp-server VM (FRR BGP router)
-- ~718 Terraform resources in the controller
+- ~698 Terraform resources in the controller
 - ~300 UDP tunnels simulating physical cables
 
 ---
@@ -75,13 +80,13 @@ configurations without requiring millions of dollars of physical hardware.
 
 | Real Hardware             | Virtual Equivalent             | OS / Software         | VM Resources      |
 |---------------------------|--------------------------------|-----------------------|-------------------|
-| Spectrum-4 EW leaf switch | libvirt/KVM VM                 | Cumulus Linux VX 5.11 | 4 vCPU, 2 GB RAM  |
-| Spectrum-4 EW spine       | libvirt/KVM VM                 | Cumulus Linux VX 5.11 | 4 vCPU, 2 GB RAM  |
-| Spectrum-4 NS leaf switch | libvirt/KVM VM                 | Cumulus Linux VX 5.11 | 4 vCPU, 2 GB RAM  |
-| Spectrum-4 NS spine       | libvirt/KVM VM                 | Cumulus Linux VX 5.11 | 4 vCPU, 2 GB RAM  |
-| OOB management leaf       | libvirt/KVM VM                 | Cumulus Linux VX 5.11 | 4 vCPU, 2 GB RAM  |
+| Spectrum-4 EW leaf switch | libvirt/KVM VM                 | Cumulus Linux VX 5.11.3 | 4 vCPU, 2 GB RAM  |
+| Spectrum-4 EW spine       | libvirt/KVM VM                 | Cumulus Linux VX 5.11.3 | 4 vCPU, 2 GB RAM  |
+| Spectrum-4 NS leaf switch | libvirt/KVM VM                 | Cumulus Linux VX 5.11.3 | 4 vCPU, 2 GB RAM  |
+| Spectrum-4 NS spine       | libvirt/KVM VM                 | Cumulus Linux VX 5.11.3 | 4 vCPU, 2 GB RAM  |
+| OOB management leaf       | libvirt/KVM VM                 | Cumulus Linux VX 5.11.3 | 4 vCPU, 2 GB RAM  |
 | NVIDIA HGX GPU server     | libvirt/KVM VM (no GPU)        | Ubuntu 24.04          | 1 vCPU, 1 GB RAM  |
-| CPU server (compute)      | libvirt/KVM VM                 | Ubuntu 24.04          | 1 vCPU, 1 GB RAM  |
+| CPU server (compute)      | libvirt/KVM VM                 | Ubuntu 24.04          | 4 vCPU, 8 GB RAM  |
 | SoftGate appliance        | libvirt/KVM VM                 | Ubuntu 24.04 + agent  | 2 vCPU, 4 GB RAM  |
 | ISP router                | isp-server VM                  | Ubuntu 24.04 + FRR    | 2 vCPU, 4 GB RAM  |
 | DHCP/mgmt infrastructure  | mgmt-server VM                 | Ubuntu 24.04          | 2 vCPU, 4 GB RAM  |
@@ -94,24 +99,34 @@ configurations without requiring millions of dollars of physical hardware.
 
 ### 4.1 Deployment Pipeline
 
-The lab is deployed in three stages, each building on the previous:
+The lab is deployed in five stages, each building on the previous:
 
 ```
-Stage 1: Netris Controller (Ansible + K3s + Helm)
+Stage 1: Prerequisites (Ansible)
+  |
+  |  OS packages, Go, Pulumi, OpenTofu, libvirt, bridges, firewall
+  v
+Stage 2: Netris Controller (Ansible + K3s + Helm)
   |
   |  Controller API is now available
   v
-Stage 2: Spectrum-X-Init (OpenTofu/Terraform)
+Stage 3: Spectrum-X-Init (OpenTofu/Terraform)
   |
   |  Controller now knows the full topology
   v
-Stage 3: Cloudsim (Pulumi/Go)
+Stage 4: Cloudsim (Pulumi/Go)
   |
   |  VMs boot, ZTP provisions them, agents connect to controller
   v
-Stage 4: Connectivity (Ansible)
+Stage 5: Connectivity (Ansible)
        OpenVPN tunnel, socat port forwarding, ISP BGP (via cloud-init)
 ```
+
+Additional roles (not part of the main deploy pipeline):
+
+- **cache**: Pre-downloads container and cloud images (run via `make setup`).
+- **verify**: Post-deploy health checks via Netris API (run via `make verify`).
+- **lab_destroy**: Teardown of all infrastructure (run via `make destroy`).
 
 ### 4.2 High-Level Architecture Diagram
 
@@ -183,28 +198,33 @@ invisible to the host's nftables -- this is why socat forwarding is required
 
 **Spectrum-X-Init (OpenTofu/Terraform)**
 
-Uses the `netrisai/netris` Terraform provider v3.6.6 to populate the
-controller with the desired topology via API calls. Creates:
+Uses the `netrisai/netris` Terraform provider (>=3.6.3) to populate the
+controller with the desired topology via API calls. Counts below assume
+`gpu_server_count=32` and `ew_fabric_enable=1`; smaller deployments scale
+proportionally.
 
-| Resource Type       | Count | Details                                     |
-|---------------------|-------|---------------------------------------------|
-| Site                | 1     | "Datacenter-1", public ASN 655001           |
-| Inventory Profiles  | 2     | East-West and North-South                   |
-| IP Allocations      | 3     | Private (10.0.0.0/8), NAT, L4LB             |
-| Subnets             | 6+    | Mgmt, loopback, NAT pool, L4LB pool, etc.  |
-| EW Leaf Switches    | 4     | 64 ports, 2x400 breakout, ASN 4200100001+  |
-| EW Spine Switches   | 2     | 64 ports, 2x400 breakout, ASN 4200200001   |
-| NS Leaf Switches    | 2     | 64 ports, 4x200 breakout, ASN 4200300001+  |
-| NS Spine Switches   | 2     | 64 ports, 4x200 breakout, ASN 4200300257+  |
-| OOB Leaf Switch     | 1     | 54 ports, ASN 4200300129                    |
-| Softgates           | 4     | 2 general-purpose, 2 SNAT                   |
-| GPU Servers (HGX)   | 32    | 16 ports each (8 data + 2 bond + 1 aux)     |
-| CPU Servers         | 5     | COMPUTE00-04, 16 ports each                 |
-| EW Leaf-Spine Links | 256   | Full mesh with /31 on 10.254.x.x            |
-| EW Leaf-Server Links| 256   | /31 on 172.x.x.x (8 data paths per server)  |
-| NS Links            | ~150  | Leaf-spine, leaf-server, leaf-softgate       |
-| BGP Sessions        | 4     | Softgate-to-ISP peering                     |
-| **Total**           |**~718**| All managed via Terraform state              |
+| Resource Type            | Count | Details                                     |
+|--------------------------|-------|---------------------------------------------|
+| Site                     | 1     | "Datacenter-1", public ASN 655001           |
+| Inventory Profiles       | 2     | East-West and North-South                   |
+| IP Allocations           | 3     | Private (10.0.0.0/8), NAT, L4LB             |
+| Subnets                  | 6+    | Mgmt, loopback, NAT pool, L4LB pool, etc.  |
+| EW Leaf Switches         | 4     | 64 ports, 2x400 breakout, ASN 4200100001+  |
+| EW Spine Switches        | 2     | 64 ports, 2x400 breakout, ASN 4200200001   |
+| NS Leaf Switches         | 2     | 64 ports, 4x200 breakout, ASN 4200300001+  |
+| NS Spine Switches        | 2     | 64 ports, 4x200 breakout, ASN 4200300257+  |
+| OOB Leaf Switch          | 1     | 54 ports, ASN 4200300129                    |
+| Softgates                | 4     | 2 general-purpose, 2 SNAT                   |
+| GPU Servers (HGX)        | 32    | 16 ports each (8 data + 2 bond + 1 aux + 5 reserved) |
+| Server Cluster Template  | 1     | Auto-generates VPCs/VNets for GPU servers   |
+| EW Leaf-Spine Links      | 256   | Full mesh with /31 on 10.254.x.x            |
+| EW Leaf-Server Links     | 256   | /31 on 172.x.x.x (8 data paths per server)  |
+| NS Links                 | ~122  | Leaf-spine, leaf-server, leaf-softgate       |
+| BGP Sessions             | 4     | Softgate-to-ISP peering                     |
+| **Total**                |**~698**| All managed via Terraform state              |
+
+Note: CPU servers (COMPUTE00-04) are **not** Terraform resources. They are
+created by the Cloudsim Pulumi stage as VMs only.
 
 **Cloudsim (Pulumi/Go)**
 
@@ -356,7 +376,7 @@ mgmt-server VM                                 |
       | OpenVPN server (tun0)                  |
       | 10.8.0.1                               |
       |                                        |
-      +-------- VPN tunnel (UDP 1194) -------->+
+      +-------- VPN tunnel (TCP 1194) -------->+
                                                |
                                         OpenVPN client (tun0)
                                         10.8.0.2
@@ -374,7 +394,7 @@ The flow:
 4. The packet traverses the OpenVPN tunnel to the host (10.8.0.2).
 5. On the host, socat picks up the packet and forwards it to the K3s pod.
 
-The OpenVPN tunnel uses UDP port 1194. The server runs inside mgmt-server;
+The OpenVPN tunnel uses TCP port 1194. The server runs inside mgmt-server;
 the client runs on the bare-metal host. A route fix script removes the
 conflicting virbr0 route for 192.168.122.0/24 that would otherwise prevent
 the VPN from establishing.
@@ -652,8 +672,8 @@ even IP in each /30; the softgate side uses the odd IP.
 
 | Direction | Policy                                                        |
 |-----------|---------------------------------------------------------------|
-| Export    | Advertises TEST-NET-3 subnets: 198.51.100.0/30 (NAT pool),   |
-|           | 198.51.100.4/30 (L4LB pool). Also sends default route.       |
+| Export    | Advertises TEST-NET-3 subnets: 198.51.100.0/29 (NAT pool),   |
+|           | 198.51.100.16/29 (L4LB pool). Also sends default route.      |
 | Import    | Accepts only public routes (filters RFC 1918 private space).  |
 
 **Why TEST-NET-3?** RFC 5737 reserves 198.51.100.0/24 for documentation and
@@ -664,19 +684,19 @@ makes the simulation self-contained.
 
 ```
 router bgp 65401
-  neighbor SG peer-group
-  neighbor SG remote-as 655001
-  neighbor SG password newNet0ps
-  neighbor 10.10.0.1 peer-group SG
-  neighbor 10.10.0.5 peer-group SG
-  neighbor 10.10.0.9 peer-group SG
-  neighbor 10.10.0.13 peer-group SG
+  neighbor V4 peer-group
+  neighbor V4 remote-as 655001
+  neighbor V4 password newNet0ps
+  neighbor 10.10.0.1 peer-group V4
+  neighbor 10.10.0.5 peer-group V4
+  neighbor 10.10.0.9 peer-group V4
+  neighbor 10.10.0.13 peer-group V4
 
   address-family ipv4 unicast
-    network 198.51.100.0/30
-    network 198.51.100.4/30
-    neighbor SG route-map EXPORT out
-    neighbor SG route-map ACCEPT_PUBLIC in
+    network 198.51.100.0/29
+    network 198.51.100.16/29
+    neighbor V4 route-map EXPORT out
+    neighbor V4 route-map ACCEPT_PUBLIC in
 ```
 
 ### 7.3 Softgate Roles
@@ -810,7 +830,7 @@ Step by step:
    softgate via Maglev consistent hashing.
 
 4. **SNAT**: The SNAT softgate performs source NAT, replacing the server's
-   private IP (192.168.0.1) with an IP from the NAT pool (198.51.100.0/30).
+   private IP (192.168.0.1) with an IP from the NAT pool (198.51.100.0/29).
    The softgate agent programs nftables NAT rules based on the controller's
    configuration, using packet marks to match SNAT-eligible flows.
 
@@ -827,7 +847,7 @@ Step by step:
 
 7. **Return path**: The response arrives at the host, is un-masqueraded
    back to the SNAT pool IP (198.51.100.0), routed via a specific route
-   (198.51.100.0/30 via 198.51.100.10) to the ISP server, which forwards
+   (198.51.100.0/29 via 198.51.100.10) to the ISP server, which forwards
    it through the BGP tunnels to the SNAT softgate. The softgate reverses
    the NAT and forwards the packet through the NS fabric back to the
    server.
@@ -848,7 +868,7 @@ mgmt-server
     | 10.253.63.254 (gateway for 10.253.0.0/18)
     | iptables MASQUERADE on tun0
     v
-OpenVPN tunnel (UDP 1194)
+OpenVPN tunnel (TCP 1194)
     |
     | 10.8.0.1 -> 10.8.0.2
     v
@@ -880,7 +900,7 @@ deployment, switches would reach the controller directly over the network.
 | 10.254.0.0/16        | EW leaf-spine link /31s           | Point-to-point links       |
 | 10.2.0.0/16          | NS loopback IPs                   | NS switches + softgates    |
 | 10.3.0.0/16          | NS management IPs                 | NS switches + softgates    |
-| 10.8.0.0/30          | VPN tunnel                        | mgmt-server <-> host       |
+| 10.8.0.0/24          | VPN tunnel                        | mgmt-server <-> host       |
 | 10.10.0.0/24         | BGP peering /30s                  | Softgate <-> ISP           |
 | 169.254.x.y/31       | NS leaf-spine links               | Point-to-point links       |
 | 172.16-30.x.y/31     | EW server data links (8 paths)    | Leaf <-> GPU server        |
@@ -888,8 +908,8 @@ deployment, switches would reach the controller directly over the network.
 | 192.168.8.0/21       | GPU server IPMI                   | GPU server OOB ports       |
 | 192.168.16.0/20      | Server management                 | GPU + CPU server mgmt      |
 | 192.168.122.0/24     | libvirt NAT bridge                | mgmt-server, isp-server    |
-| 198.51.100.0/30      | NAT pool (TEST-NET-3)             | Softgate SNAT              |
-| 198.51.100.4/30      | L4LB pool (TEST-NET-3)            | Softgate L4LB VIPs         |
+| 198.51.100.0/29      | NAT pool (TEST-NET-3)             | Softgate SNAT              |
+| 198.51.100.16/29     | L4LB pool (TEST-NET-3)            | Softgate L4LB VIPs         |
 | 198.51.100.8/29      | BGP link subnet                   | ISP uplink addressing      |
 
 ## Appendix B: ASN Map
@@ -910,7 +930,7 @@ deployment, switches would reach the controller directly over the network.
 
 | Port  | Protocol | Service            | Listener               |
 |-------|----------|--------------------|------------------------|
-| 1194  | UDP      | OpenVPN            | mgmt-server            |
+| 1194  | TCP      | OpenVPN            | mgmt-server            |
 | 2003  | TCP      | Graphite           | socat -> K3s           |
 | 3033  | TCP      | Telescope          | socat -> K3s           |
 | 3034  | TCP      | Telescope TLS      | socat -> K3s           |
@@ -952,13 +972,13 @@ softgate internet access during agent installation.
 **Return-path routing for SNAT pools:** The host's br-public interface must
 not have a prefix length that covers the NAT/L4LB pool addresses. If the
 host has 198.51.100.x/24, the entire 198.51.100.0/24 becomes a connected
-route -- reply packets destined for the SNAT pool (198.51.100.0/30) are
+route -- reply packets destined for the SNAT pool (198.51.100.0/29) are
 delivered directly on br-public instead of being routed back through the
 ISP server to the softgates. The fix is to add specific routes:
 
 ```
-ip route add 198.51.100.0/30 via 198.51.100.10 dev br-public
-ip route add 198.51.100.4/30 via 198.51.100.10 dev br-public
+ip route add 198.51.100.0/29 via 198.51.100.10 dev br-public
+ip route add 198.51.100.16/29 via 198.51.100.10 dev br-public
 ```
 
 This ensures SNAT'd reply traffic follows the correct return path:
