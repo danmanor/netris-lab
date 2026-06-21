@@ -3,4 +3,4 @@
   hosts: lab
   become: true
   roles:
-    - destroy
+    - lab_destroy
