@@ -21,6 +21,15 @@
     pulumi destroy --yes
   ignore_errors: true
 
+- name: Remove any orphaned VMs
+  shell: |
+    for vm in $(virsh list --all --name 2>/dev/null | grep -v '^$'); do
+      virsh destroy "$vm" 2>/dev/null
+      virsh undefine "$vm" --remove-all-storage 2>/dev/null
+    done
+  ignore_errors: true
+  changed_when: false
+
 - name: Destroy Terraform topology
   shell: |
     cd {{ topology_dir }}
