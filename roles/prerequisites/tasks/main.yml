@@ -171,35 +171,6 @@
     line: 'security_driver = "none"'
   notify: Restart libvirtd
 
-- name: Check br-mgmt exists
-  command: ip link show {{ mgmt_bridge_name }}
-  register: br_mgmt_check
-  changed_when: false
-  failed_when: false
-
-- name: Create br-mgmt bridge
-  when: br_mgmt_check.rc != 0
-  shell: |
-    ip link add name {{ mgmt_bridge_name }} type bridge
-    ip addr add {{ mgmt_bridge_cidr }} dev {{ mgmt_bridge_name }}
-    ip link set dev {{ mgmt_bridge_name }} up
-
-- name: Ensure br-mgmt is up
-  command: ip link set dev {{ mgmt_bridge_name }} up
-  changed_when: false
-
-- name: Check br-public exists
-  command: ip link show {{ public_bridge_name }}
-  register: br_public_check
-  changed_when: false
-  failed_when: false
-
-- name: Create br-public bridge
-  when: br_public_check.rc != 0
-  shell: |
-    ip link add name {{ public_bridge_name }} type bridge
-    ip link set dev {{ public_bridge_name }} up
-
 - name: Bridge public interface to br-public (public mode)
   when: connectivity_mode == "public" and public_interface is defined
   block:
