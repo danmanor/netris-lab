@@ -34,11 +34,14 @@
 - name: Install and start FRR on ISP server
   when: isp_frr_check.stdout is not defined or isp_frr_check.stdout != "active"
   shell: |
-    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@192.168.122.15 "
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=30 root@192.168.122.15 "
       echo 'Acquire::ForceIPv4 \"true\";' > /etc/apt/apt.conf.d/99force-ipv4
+      # Wait for cloud-init apt to finish
+      while fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend 2>/dev/null; do
+        sleep 5
+      done
       apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y frr 2>&1 | tail -3
       sed -i '/bgpd=no/c\bgpd=yes' /etc/frr/daemons
       test -f /tmp/frr.conf && cp /tmp/frr.conf /etc/frr/frr.conf
       systemctl restart frr
     "
-  ignore_errors: true
