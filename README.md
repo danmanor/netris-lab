@@ -124,8 +124,6 @@ make cache           # Save K3s container + cloud images to local cache
 
 After the first deploy, `make cache` (or `make setup`) saves all container and cloud images to `/var/cache/netris-lab/`. Subsequent deploy/destroy cycles load from cache — no Docker Hub pulls, no rate limits.
 
-The destroy playbook also auto-saves images before uninstalling K3s.
-
 ### East-West Fabric
 
 Set `ew_fabric_enable: 1` to deploy the EW GPU fabric (leaf-spine) in addition to the NS fabric. With 4 GPU servers this creates 1 EW leaf + 1 EW spine. With 32+ servers it scales to the full Spectrum-X topology (4+ leaves, 2+ spines).
@@ -167,7 +165,7 @@ netris-lab/
 ├── playbooks/
 │   ├── cache.yml                       # image caching
 │   ├── deploy.yml                      # full deploy
-│   ├── destroy.yml                     # full teardown (caches images before uninstall)
+│   ├── destroy.yml                     # full teardown
 │   ├── prerequisites.yml               # system dependencies
 │   ├── verify.yml                      # health check — asserts switches/softgates/E-BGP
 │   └── connectivity.yml                # connectivity-only re-run
@@ -178,7 +176,8 @@ netris-lab/
 │   ├── topology/                       # OpenTofu — creates switches, servers, links in controller
 │   ├── cloudsim/                       # Pulumi — creates KVM VMs simulating the topology
 │   ├── connectivity/                   # VPN, socat port forwarding, ISP FRR, softgate agents
-│   └── verify/                         # Health checks via Netris API
+│   ├── verify/                         # Health checks via Netris API
+│   └── lab_destroy/                    # Teardown: VMs, topology, K3s, bridges, cleanup
 ├── collections/
 │   └── ansible_collections/            # netris.controller, ansible.posix, ansible.utils
 ├── netris-cloudsim/                    # Pulumi Go project for VM provisioning
